@@ -1,26 +1,357 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens — DevTools palette.
+   Never pure black: the base is #08090a and surfaces step up from it, so 1px
+   borders at low opacity stay visible instead of disappearing into the void.
+   Secondary text drops opacity rather than switching to a flat grey.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #08090a;
+  --surface: #0e1011;
+  --surface-hover: #131618;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+
+  --text: #f2f4f5;
+  --text-muted: rgba(242, 244, 245, 0.62);
+  --text-faint: rgba(242, 244, 245, 0.38);
+
+  --accent: #6e8bff;
+  --accent-dim: rgba(110, 139, 255, 0.14);
+
+  /* Snappy with a hair of overshoot — spring feel, no JS. */
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+  --dur: 160ms;
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
+  --font-display: var(--font-display-stack);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+* {
+  border-color: var(--border);
+}
+
+/* Anchor targets must clear the fixed 56px header, or the heading you jumped to
+   lands underneath it. */
+:target,
+section[id],
+footer[id] {
+  scroll-margin-top: 5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans-stack), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Background grid — 1px lines faded out by a radial mask, pure CSS.
+--------------------------------------------------------------------------- */
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
+}
+
+
+
+/* ---------------------------------------------------------------------------
+   Cards — 1px border, and a light gradient on the border that follows the
+   cursor. The --mx/--my vars are set by <GlowCard>; with JS off the card is
+   simply a clean bordered surface, which is the correct fallback.
+--------------------------------------------------------------------------- */
+.card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: background var(--dur) var(--ease-spring),
+              border-color var(--dur) var(--ease-spring),
+              box-shadow var(--dur) var(--ease-spring);
+}
+
+.card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.28),
+    transparent 65%
+  );
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Type helpers
+--------------------------------------------------------------------------- */
+.eyebrow {
+  font-family: var(--font-mono-stack), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.mono {
+  font-family: var(--font-mono-stack), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-link {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  transition: color var(--dur) var(--ease-spring);
+}
+
+.nav-link:hover {
+  color: var(--text);
+}
+
+.mobile-nav-link {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  transition: color var(--dur) var(--ease-spring);
+}
+
+.mobile-nav-link:hover {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scroll reveal — compositor-only (opacity + translate), no JS, no library.
+   Cross-browser in 2026; @supports means unsupported browsers just show the
+   content, which is the correct fallback.
+--------------------------------------------------------------------------- */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 2% cover 32%;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Panel — the framed "system view" surface used for set-pieces. Reads as a
+   window onto a tool rather than as a content card.
+--------------------------------------------------------------------------- */
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.panel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ---------------------------------------------------------------------------
+   Display type — serif, tight tracking. Resend runs -0.01em at hero sizes and
+   tighter at mid display sizes; the compressed tracking is what reads as
+   confident rather than merely large.
+--------------------------------------------------------------------------- */
+.display {
+  font-family: var(--font-display-stack), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+}
+
+.display-hero {
+  letter-spacing: -0.015em;
+  line-height: 0.94;
+}
+
+/* ---------------------------------------------------------------------------
+   Entry animation — runs once on load, staggered. Compositor-only, no JS.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes enter {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .enter {
+    animation: enter 1100ms var(--ease-out-soft) both;
+  }
+
+  .enter-1 { animation-delay: 120ms; }
+  .enter-2 { animation-delay: 260ms; }
+  .enter-3 { animation-delay: 430ms; }
+  .enter-4 { animation-delay: 600ms; }
+  .enter-5 { animation-delay: 760ms; }
+
+  @keyframes portrait-in {
+    from { opacity: 0; transform: scale(1.04); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .portrait-enter {
+    animation: portrait-in 900ms var(--ease-out-soft) 180ms both;
+  }
+}
+
+/* Accent-lit divider — the one saturated moment per section break. */
+.rule-accent {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    rgba(110, 139, 255, 0.22) 18%,
+    var(--border) 45%,
+    transparent 100%
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Post body
+--------------------------------------------------------------------------- */
+.prose-post { color: var(--text-muted); font-size: 1.0625rem; line-height: 1.75; }
+.prose-post > * + * { margin-top: 1.5rem; }
+
+.prose-post h2 {
+  font-family: var(--font-display-stack), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  font-size: 1.875rem;
+  color: var(--text);
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.prose-post h3 { font-size: 1.1875rem; color: var(--text); margin-top: 2.5rem; font-weight: 600; }
+.prose-post strong { color: var(--text); font-weight: 600; }
+.prose-post a { color: var(--accent); text-underline-offset: 3px; text-decoration: underline; }
+.prose-post ul, .prose-post ol { padding-left: 1.25rem; }
+.prose-post li { margin-top: 0.5rem; }
+.prose-post ul { list-style: disc; }
+.prose-post ol { list-style: decimal; }
+
+.prose-post :not(pre) > code {
+  font-family: var(--font-mono-stack), ui-monospace, monospace;
+  font-size: 0.86em;
+  color: var(--text);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.1em 0.36em;
+}
+
+.prose-post pre {
+  font-family: var(--font-mono-stack), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 1.15rem 1.25rem;
+  overflow-x: auto;
+}
+
+.prose-post pre code { display: grid; }
+.prose-post pre [data-line] { padding: 0 0.15rem; }
+
+/* ---------------------------------------------------------------------------
+   Portrait — no frame. The photo's own background is near-black, so masking the
+   edges to transparent lets it dissolve into the page instead of sitting on it
+   as a rectangle. Centred high so the shoulders fade most.
+--------------------------------------------------------------------------- */
+.portrait-fade {
+  -webkit-mask-image: radial-gradient(
+    ellipse 82% 64% at 50% 34%,
+    #000 42%,
+    rgba(0, 0, 0, 0.6) 70%,
+    transparent 96%
+  );
+  mask-image: radial-gradient(
+    ellipse 82% 64% at 50% 34%,
+    #000 42%,
+    rgba(0, 0, 0, 0.6) 70%,
+    transparent 96%
+  );
 }

@@ -1,0 +1,203 @@
+Most headless CMS setups assume one site. Ours holds several brands in a single
+Strapi instance — shared content types, shared components, one admin panel, and a
+`brand` relation on every entry that decides which site a piece of content belongs
+to.
+
+That model is cheap to build and it works. What nobody warns you about is the
+failure mode it creates: **nothing in the admin panel stops an editor from
+touching the wrong brand.** The list view shows every brand's pages at once. The
+relation picker offers every brand's pages as link targets. Both are one careless
+click away from publishing one brand's content into another's site.
+
+You can't fix that with training. It has to be fixed in the admin UI — and the
+two halves of it turned out to need completely different approaches, because
+Strapi gives you a way into one of them and no way into the other.
+
+## Why not just fork the admin panel
+
+The obvious move is to customise Strapi's admin. Resist it. Strapi's admin is a
+React application that ships with the framework, and every version bump replays
+whatever you changed into a merge conflict.
+
+The supported route is **injection zones**: named slots in the admin UI where a
+plugin can mount its own component without touching the host application.
+
+```js
+// admin/src/index.js
+export default {
+  bootstrap(app) {
+    app.getPlugin('content-manager').injectComponent('listView', 'actions', {
+      name: 'BrandSelector',
+      Component: BrandSelector,
+    })
+  },
+}
+```
+
+Two arguments — the view and the zone. Your component now renders in the list
+view's action bar, and upgrading Strapi doesn't care that it exists.
+
+## The part I got wrong first
+
+My first instinct was to build filtering: query the entries myself, hold the
+results in plugin state, render my own list.
+
+That was the wrong shape, and it took building most of it to see why. Strapi's
+list view **already** filters — it reads its filters from the URL query string.
+Every one of its own controls does nothing but rewrite that query string. Building
+a parallel filter meant reimplementing pagination, sorting, locale handling and
+search, and then keeping all four in sync with a component I didn't own.
+
+The version that survived does not filter anything. It writes a URL.
+
+```js
+const applyFilter = (brand) => {
+  const url = new URL(window.location.href)
+  const params = new URLSearchParams(url.search)
+
+  const FILTER_KEY = 'filters[$and][0][brand][display_name][$eq]'
+  brand === 'all-brands' ? params.delete(FILTER_KEY) : params.set(FILTER_KEY, brand)
+
+  navigate({ pathname: url.pathname, search: params.toString() })
+}
+```
+
+That is the whole mechanism. The dropdown is a URL writer; Strapi does the
+filtering it was always going to do. Pagination, sorting and search keep working
+because I never took them away.
+
+This is the part worth generalising: **when you extend a tool, find the input its
+own features already run on and write to that.** The alternative — building a
+second system beside the first — is more code on day one and unbounded
+maintenance afterwards.
+
+## Making it stick between pages
+
+One detail turns this from a demo into something editors will actually use.
+
+A brand selection that resets every time you navigate is worse than no selection,
+because now you have to re-pick it constantly. The choice belongs in
+`localStorage`, restored on mount and reapplied to the URL:
+
+```js
+useEffect(() => {
+  const stored = window.localStorage.getItem('selectedBrand')
+  if (stored) {
+    setSelectedBrand(stored)
+    applyFilter(stored)
+  }
+}, [])
+```
+
+An editor who works on one brand all morning picks it once.
+
+## Not every content type wants this
+
+A brand dropdown on a content type with no `brand` relation is a dead control
+that filters everything to nothing. Which types get it is deployment
+configuration, not something to hardcode:
+
+```js
+// config/plugins.js
+'brand-selector': {
+  enabled: true,
+  resolve: './src/plugins/brand-selector',
+  config: {
+    showDropdown: ['api::page.page', 'api::redirect.redirect', 'api::faq.faq'],
+  },
+}
+```
+
+The component reads that config, compares it against the content type currently
+in view, and renders `null` when it doesn't apply.
+
+## The wall: relations don't filter
+
+I shipped this, watched editors use it, and went looking for the same fix one
+level down — the relation fields. A page links to other pages; those pickers
+should narrow to the current brand the same way the list now did.
+
+There is no setting for it. **Strapi's relation field doesn't support filtering
+at all.** The only dimension it narrows by is locale, which it handles
+internally. There is no allowlist, no query hook, no `where` you can hand it. The
+picker fetches every entry of the target content type and shows you the lot.
+
+That reframed the problem. The list view had a seam I could write to — the URL.
+The relation field has no seam. So the field itself had to go.
+
+## Replacing the field instead of configuring it
+
+A Strapi **custom field** is a field type you define, registered on both the admin
+and the server so entries validate identically either way:
+
+```js
+// server/src/register.js
+strapi.customFields.register({
+  name: 'brand-filtered-page',
+  plugin: 'brand-filtered-page',
+  type: 'json',
+})
+```
+
+```js
+// admin/src/index.js
+app.customFields.register({
+  name: 'brand-filtered-page',
+  pluginId: 'brand-filtered-page',
+  type: 'json',
+  components: {
+    Input: async () => import('./components/BrandFilteredPageInput.jsx'),
+  },
+})
+```
+
+Because the input is mine, it can source its own options — a plugin endpoint that
+queries pages with a brand filter, plus search, pagination and locale, which the
+built-in picker gave me for free and I now had to put back by hand. That is the
+real price of leaving the framework's path, and it's worth knowing before you
+start: you inherit everything the component you replaced was quietly doing.
+
+## Don't ask the editor what you already know
+
+The endpoint could have taken a brand parameter and let the editor choose. That
+just moves the mistake one step earlier — a wrong brand picked in a dropdown
+produces exactly the wrong link the whole exercise was meant to prevent.
+
+They shouldn't have to choose, because the entry being edited already knows its
+brand. When the request doesn't carry one, the endpoint reads it off the current
+entry:
+
+```js
+if (!brandId && currentEntryId && currentModel) {
+  const entry = await strapi.documents(currentModel).findOne({
+    documentId: currentEntryId,
+    locale,
+    fields: [],
+    populate: { brand: { fields: ['id'] } },
+  })
+  brandId = entry?.brand?.id
+}
+```
+
+From the editor's side, nothing happens. They open a page, add a link, and the
+only pages offered are the ones that belong there. It doesn't announce itself as
+a custom field, which is the point — the safe path became the default path, and
+that's the only kind of guardrail people don't route around.
+
+## What I'd tell myself at the start
+
+**Find the seam before you design the fix.** The list view and the relation field
+looked like the same problem, so I assumed one approach would cover both. They
+weren't: one exposes its state through the URL, the other exposes nothing. What
+the framework lets you reach into decides the shape of your solution — so find
+that out first, not after you've designed around a hook that doesn't exist.
+
+**A missing extension point is a real answer.** I lost time looking for the
+relation-field filter option on the assumption that something this ordinary must
+be configurable. Sometimes it isn't, and "replace the component" is the supported
+path rather than a hack. Just count the cost honestly first: search, pagination
+and locale all came back as my code.
+
+**Infer context instead of asking for it.** Every setting an editor has to choose
+correctly is a setting they can choose wrongly. The entry knew its own brand the
+whole time — reading it was less code than the dropdown I almost added.

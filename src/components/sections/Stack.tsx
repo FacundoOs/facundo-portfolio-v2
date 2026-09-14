@@ -1,80 +1,56 @@
+import SectionHeading from '@/components/layout/SectionHeading'
+import { stackGroups } from '@/data/stack'
+
+/**
+ * Some brand marks are black or near-black (Next.js, Vercel, Express) and are
+ * invisible on this background. Anything below the luminance floor renders in
+ * the foreground colour instead.
+ */
+function markColour(hex?: string) {
+  if (!hex) return 'var(--text)'
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return lum < 0.28 ? 'var(--text)' : `#${hex}`
+}
+
 export default function Stack() {
-  const categories = [
-    {
-      title: "Frontend",
-      tech: ["Next.js 15", "React 18", "TypeScript", "Tailwind CSS"],
-      gradient: "from-cyan-500 to-blue-500",
-      icon: "⚛️"
-    },
-    {
-      title: "Backend & Data",
-      tech: ["Node.js", "Strapi v5", "Redis", "Docker"],
-      gradient: "from-emerald-500 to-teal-500",
-      icon: "🔧"
-    },
-    {
-      title: "Cloud & DevOps",
-      tech: ["Vercel", "Netlify", "AWS", "CI/CD"],
-      gradient: "from-purple-500 to-pink-500",
-      icon: "☁️"
-    },
-    {
-      title: "AI & Modern",
-      tech: ["OpenAI API", "LangChain", "RAG", "Vector DB"],
-      gradient: "from-orange-500 to-red-500",
-      icon: "🤖"
-    }
-  ]
-
   return (
-    <section id="stack" className="py-32 bg-gradient-to-b from-transparent to-black/50">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-24">
-          <h2 className="text-5xl lg:text-7xl font-black bg-gradient-to-r from-white via-cyan-100 to-purple-200 bg-clip-text text-transparent mb-6">
-            Tech Stack
-          </h2>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Technologies I use daily to build scalable products
-          </p>
-          <div className="w-24 h-1 bg-gradient-to-r from-cyan-400 to-purple-500 mx-auto rounded-full mt-6" />
-        </div>
+    <section id="stack" className="mx-auto max-w-6xl px-6 py-12">
+      <SectionHeading label="Stack" title="What I reach for" />
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {categories.map((category, i) => (
-            <div 
-              key={i}
-              className="group relative overflow-hidden rounded-3xl bg-black/30 backdrop-blur-xl border border-white/10 hover:border-white/30 p-10 hover:bg-white/5 transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-[0_0_50px_rgba(0,194,255,0.3)]"
-            >
-              {/* Gradient background */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-20 transition-all duration-700`} />
-              
-              {/* Icon */}
-              <div className="relative z-10 text-4xl mb-6 group-hover:scale-110 transition-transform duration-500">
-                {category.icon}
-              </div>
-              
-              {/* Category title */}
-              <h3 className="text-2xl font-bold text-white mb-8 relative z-10 group-hover:text-cyan-300 transition-colors">
-                {category.title}
-              </h3>
-              
-              {/* Tech badges */}
-              <div className="space-y-3">
-                {category.tech.map((tech, j) => (
-                  <div 
-                    key={j}
-                    className="group/tech flex items-center gap-3 p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:translate-x-2 hover:shadow-lg"
-                  >
-                    <div className="w-10 h-10 bg-gradient-to-r from-white/20 to-transparent rounded-lg flex items-center justify-center backdrop-blur-sm" />
-                    <span className="font-medium text-gray-200 group-hover/tech:text-white transition-colors">
-                      {tech}
+      <div className="reveal grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        {stackGroups.map((group) => (
+          <div key={group.title}>
+            <h3 className="eyebrow mb-5 border-t border-[var(--border)] pt-4">{group.title}</h3>
+
+            <ul className="space-y-1">
+              {group.tech.map((t) => (
+                <li key={t.name}>
+                  <span className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 -mx-2 transition-colors duration-[160ms] hover:bg-[var(--surface-hover)]">
+                    {t.d ? (
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-[15px] w-[15px] shrink-0 opacity-70 transition-opacity duration-[160ms] group-hover:opacity-100"
+                        style={{ color: markColour(t.hex) }}
+                        fill="currentColor"
+                        aria-hidden
+                      >
+                        <path d={t.d} />
+                      </svg>
+                    ) : (
+                      <span className="mono flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-[3px] border border-[var(--border-strong)] text-[7px] text-faint">
+                        {t.name.slice(0, 3).toLowerCase()}
+                      </span>
+                    )}
+                    <span className="text-sm text-muted transition-colors duration-[160ms] group-hover:text-text">
+                      {t.name}
                     </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     </section>
   )
