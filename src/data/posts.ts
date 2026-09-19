@@ -21,6 +21,16 @@ export const posts: Post[] = [
     tags: ['Strapi', 'CMS', 'Custom fields', 'Architecture'],
     published: true,
   },
+  {
+    slug: 'local-ai-coding-mac-mini-ollama',
+    title: 'Local AI coding on a 24 GB Mac mini M4 Pro with Ollama',
+    description:
+      'What actually runs on a 24 GB Mac mini M4 Pro: a three-model Ollama setup for Continue.dev, the four models that got cut, and measured memory numbers.',
+    date: '2026-09-20',
+    readingMinutes: 7,
+    tags: ['Ollama', 'Local LLMs', 'Continue.dev', 'Developer tooling'],
+    published: true,
+  },
 ]
 
 export const publishedPosts = posts

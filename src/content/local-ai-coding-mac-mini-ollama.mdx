@@ -1,0 +1,175 @@
+Most guides to running coding models locally assume a GPU rig or a machine with
+64 GB of RAM. I ran mine on a Mac mini M4 Pro with 24 GB — enough for real
+models, and tight enough that every choice has a price.
+
+The setup that survived is three small models, one job each, wired into
+Continue.dev. Getting there meant discarding more than I kept, and the reasons
+were rarely the ones I expected.
+
+## The budget is not 24 GB
+
+On Apple silicon the model, its context cache, your editor and the rest of macOS
+all draw from one pool of unified memory. A model's file size is only the first
+line of the bill: the KV cache grows with context length, and a coding assistant
+wants a lot of context.
+
+That makes "does it fit" the wrong question. The useful one is **does it fit
+while I'm also running an editor, a browser and a dev server?**
+
+These are rough numbers from `ollama ps` and Activity Monitor, not a benchmark.
+With the final setup loaded and idle:
+
+- `llama3.1:8b` — about 5.2–5.8 GB
+- `qwen2.5-coder:1.5b` — about 1.1–1.3 GB
+- `nomic-embed-text` — about 0.3–0.4 GB
+
+The `ollama` process sat at roughly 7–8 GB of real memory. Once I was actually
+working — several tabs in Arc, some Docker, a Next.js dev server — total system
+memory reached 18–20 GB. Swap became visible once used memory passed about
+20–21 GB, cache and compressed memory included.
+
+So the working budget was simple: about 7–8 GB for Ollama, 10–12 GB for
+everything else. Past that, anything that made the context grow — agent mode with
+several files and a long history — made the machine feel like it was thinking,
+with the fan climbing, even when it never quite froze.
+
+## The setup that survived
+
+Three models, each doing the one job it's suited to:
+
+```yaml
+# ~/.continue/config.yaml
+models:
+  - name: Llama 3.1 8B
+    provider: ollama
+    model: llama3.1:8b
+    roles:
+      - chat
+      - edit
+      - apply
+    capabilities:
+      - tool_use
+
+  - name: Qwen2.5 Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b
+    roles:
+      - autocomplete
+
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text
+    roles:
+      - embed
+```
+
+The split is the point. Autocomplete is judged in milliseconds, so it gets a
+1.5B model that answers before you've stopped typing. Agent mode is judged on
+whether the model calls tools correctly, not on how well it writes code. Codebase
+search is judged on retrieval, which is what the embedding model is for. No single
+model wins on all three, and the one you'd pick for chat is far too slow for
+autocomplete.
+
+One detail cost me time. Continue only offers agent mode for models that can call
+tools, and for models served through Ollama that isn't always detected for you.
+With some models, mostly the qwen3 family, leaving out
+`capabilities: [tool_use]` meant agent mode didn't appear or didn't behave as
+expected. It's a declaration you make yourself.
+
+## What didn't make it
+
+Most of the models I cut were fine in a terminal and failed in the editor. That's the
+pattern worth naming: a single prompt to `ollama run` and an agent loop are two
+different workloads. The agent carries history, re-reads files, retries tool
+calls and keeps growing its context. The same model that answers instantly in a
+terminal can be unusable behind an agent.
+
+**qwen2.5-coder 7B.** My first main model. For concrete prompts and moderate
+context it was great: good code, decent reasoning. In agent mode, with history and
+several open files, memory climbed fast, the machine started swapping and the
+editor crawled while the model "thought" for minutes. It moved to one-off chat in
+the terminal.
+
+**qwen2.5-coder 14B.** Attractive on paper: better reasoning, better code. In
+24 GB the model alone took a large share of memory, and any agent context pushed
+the system into swap almost immediately. Latency was high before it even
+collapsed. I dropped it quickly.
+
+**qwen3 (4B and 8B, plus an instruct variant).** Strong benchmarks, long-context
+support, solid reasoning — and slower than expected in multi-step flows, with
+extra overhead from the long context they wanted to use. The bigger problem was
+tool calling. Continue often didn't detect `tool_use` on them, so I forced it in
+the config, and even then the behaviour was inconsistent. Fine on simple prompts;
+in complex flows, with several calls, retries and a large context, they failed
+more often than I expected or stalled without calling the right tools.
+
+**devstral-small-2.** The clearest case of a model that reads well on paper and
+hurts on the machine. It's a ~24B model built for coding and agents. In a
+terminal, with a direct prompt and limited context, it answered well. In agent
+mode the memory spiked, the Mac slowed to a crawl with the fan at full speed, and
+it could sit "thinking" for four minutes or more while the whole system dragged.
+I had to kill the process several times. Too big for 24 GB as an agent; it may
+still make sense for narrow terminal queries.
+
+## Which tools work locally
+
+I tried four: Continue.dev, Aider, OpenCode and Claude Code.
+
+**Continue.dev** is the one that stayed. It plugs straight into Cursor, where I
+write my code, it's configured through YAML, and it supports several models with different roles,
+which is exactly the split I needed. It works well with Ollama as a backend. It has
+its rough edges — tool detection isn't always automatic and the config takes some
+care — but it's the only one that gave me real control over how each model is
+used.
+
+**Aider** I tried as an experiment against Ollama. For very specific changes in
+one or two files it works fairly well. As a general agent on a large repo it felt
+more limited than Continue in configuration and control, and I never found a clear
+place for it in my daily flow.
+
+**OpenCode** I used for a while as a terminal agent. Fine for simple flows: one
+prompt, one answer, some editing. When the context grows or the flow gets more
+involved, the experience degrades fast in 24 GB. It didn't give me enough over
+`ollama run` plus Continue to earn a place in the setup.
+
+**Claude Code** I used with the cloud model, not a local one. It's where I send
+the work I don't want to solve locally: large refactors, architecture design, deep
+multi-file changes. It doesn't compete with the local setup, it's a different
+tier. Local covers the day to day; Claude Code is for what justifies paying and
+waiting.
+
+## What local is actually for
+
+A local setup on 24 GB is not a substitute for a frontier model on hard work:
+large, complex refactors, deep architecture design, multi-file changes that need a
+lot of reasoning and a huge context.
+
+It is very good at other things:
+
+- Cheap, fast autocomplete without sending every keystroke to the cloud.
+- Code you'd rather keep on your machine.
+- Learning how these systems behave when you control every layer — model,
+  context, tools.
+- Daily work: small edits, explaining code, tests, minor refactors, docs.
+
+Local isn't there to replace a cloud model on the hard problems. It's a fast,
+private, controllable assistant for the bulk of the daily work.
+
+## What I'd tell myself at the start
+
+**Budget in memory, not in parameters.** The number on the model card is the
+floor. Context length and everything else running on the machine decide whether
+it's usable. For me that meant roughly 7–8 GB for Ollama and the rest for
+everything else.
+
+**Split by job, not by model.** Latency, tool calling and retrieval are three
+different requirements. Trying to satisfy all of them with one model is how you
+end up with something too slow to autocomplete and too weak to trust as an agent.
+
+**Test the capability you need, in the workload you'll run.** I picked
+`llama3.1:8b` for agent mode not because it's the best code model, but because it
+was the most reliable at calling tools inside my memory limit. The larger,
+coding-tuned models looked better in benchmarks and isolated prompts, then failed
+as agents: inconsistent tool calling, long response times, more swap. The smaller
+generalist was more stable in the real flow. What matters is tool calling,
+latency and stability with a long context — not a code benchmark in the abstract.
