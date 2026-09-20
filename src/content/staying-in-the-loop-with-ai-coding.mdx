@@ -1,0 +1,141 @@
+The failure mode of coding with an AI tool isn't bad code. Bad code shows up in
+review, in tests, in production, and you deal with it. The one I ran into was
+quieter: I kept shipping changes that worked and slowly stopped knowing why they
+were shaped the way they were.
+
+I lean on Claude Code heavily. At some point I noticed I had disengaged from the
+reasoning behind my own technical decisions, and it took a direct question in a
+review to make it visible.
+
+This is what I changed, and why it works.
+
+## What it looked like
+
+It was a technical review of a feature I had implemented, with a lot of help from
+Claude Code. Someone asked why I'd chosen this folder structure and this hooks
+pattern instead of another one.
+
+I knew *what* I had done. I couldn't explain *why* it had that shape and not
+another. I could say it looked cleaner, or that it followed the pattern in the
+repo. When the follow-ups came — what trade-offs did you see, why not the
+approach we already use elsewhere — I ran out of arguments.
+
+The code worked. The tests passed. Review had raised no serious objections. And I
+had no clear account of the decisions behind it. It wasn't a visible failure so
+much as a feeling: as if I had delegated the reasoning along with the typing.
+
+## Why it happens
+
+Writing code used to force decisions. You couldn't type the next line without
+choosing what it should be. With a generating tool, the decision and the typing
+come apart: the tool proposes a complete answer, and your job shrinks to judging
+it.
+
+Judging is easier than deciding, so you do more of it, and the part of your head
+that does the deciding gets less exercise. Nothing about that is a flaw in the
+tool. It's what the tool is for. The cost is that **you can approve a change you
+could not have argued for.**
+
+## Three things I changed
+
+**I explain my thinking before I generate anything.** Mostly this happens in the
+prompt itself: a block at the top saying what the problem is, what already exists
+in the repo, what I want to avoid and why, and what I think the shape of the
+solution is. For bigger problems I use a scratch file, sketch the problem, list
+the options I see and note what I like and dislike about each, then condense it
+into the prompt.
+
+A refactor of a service layer shows what it buys. I had one large function doing
+three things, and before generating anything I wrote:
+
+> I want to split this into three modules: one that only calls the external API,
+> one that transforms the data, and one that orchestrates the flow. My instinct is
+> that the orchestrator shouldn't know anything about the transformation. I'm not
+> touching caching yet. Before you generate code, tell me if you see a problem
+> with this split or something I'm not considering.
+
+The output respected the split, but at one point it suggested merging
+transformation and orchestration "to simplify". Because I had committed to a
+position, I could say no and say why. Without it, I would have accepted the
+simpler version and never known what I'd traded away.
+
+**I form my own hypothesis before the meeting.** Before technical refinements and
+design discussions, I work out what I think is going on before asking the tool
+anything. Fifteen to thirty minutes for a medium feature, up to an hour for a
+bigger change like a new integration.
+
+For an authentication feature, I read the docs of the solution we were going to
+use, looked at how login was already handled in the repo, and wrote down a
+hypothesis: the main change would be the refresh token flow, it would touch the
+auth middleware and the hook the frontend uses, and it shouldn't affect the
+service layer. I also listed risks: refreshes firing too often if timeouts were
+off, and the frontend ending up with two sources of truth.
+
+In the meeting, the refresh token part was right. The middleware part was wrong:
+the impact was smaller than I thought, and the hook was already prepared for it.
+Having a hypothesis meant I found the gap faster and asked a sharper question —
+why doesn't the middleware need to change if the token is renewed this way? —
+instead of sitting there nodding.
+
+**I automate less where the decision is architectural.** Implementation is easy to
+delegate. Boundaries, data flow and what to build versus buy are not, because
+that's where the cost of not understanding compounds.
+
+The clearest case was deciding the boundaries between a new backend-for-frontend
+layer and the existing backend services. I worked it out by hand on a digital
+whiteboard: which endpoints the layer exposes, which services it calls, where
+business logic ends and orchestration begins, which authorization rules live where,
+and which doors to leave open for later, like adding caching without touching the
+frontend.
+
+Doing it by hand made me uncomfortable in useful ways. What happens if this
+service changes its contract? What do we want to be easy to change? A tool would
+have given me a reasonable design, but I wouldn't have felt the tension between
+the options, and I wouldn't know why the boundaries sit where they do. The
+implementation afterwards — endpoints, handlers, tests — I did delegate heavily.
+The boundaries and the reasons were mine.
+
+## What I still hand over
+
+The aim was never to use the tool less. I delegate without guilt:
+
+- **Boilerplate:** basic forms, lists and tables from patterns already defined;
+  repetitive config like Dockerfiles, build scripts and CI. I understand these
+  patterns, and if something is wrong it shows up in review or on the first run.
+- **Tests:** unit and integration tests from existing code, and sometimes edge
+  cases I hadn't thought of. I read them and adjust them.
+- **Mechanical migrations and refactors:** swapping a library for one with a
+  similar API, bumping versions, renaming things. The diffs are long but
+  predictable, with little room for hidden design decisions.
+
+What I don't delegate, or delegate very little: where the boundaries between
+modules and services go, which architectural patterns to use, and any decision
+that affects how the system will evolve.
+
+The line I use is whether I can describe a change in a sentence or two without
+quoting code, or sketch what it touches and why on a whiteboard. If I can't, I
+haven't thought it through enough to own it.
+
+## What changed
+
+I haven't measured it, so this is qualitative. But the difference shows up in
+specific places.
+
+In technical meetings I can explain the *why* of a decision without looking at
+the code, and when I'm wrong I see faster where my reasoning went off. In code
+review, mine and other people's, I understand the intent behind a change sooner
+and find it easier to ask design questions instead of only commenting on
+implementation. And code I generated with AI help feels less like something
+someone else wrote. I'm more likely to say "I thought about it this way because…"
+than "it more or less worked."
+
+## What I'd tell myself at the start
+
+**The risk is comprehension, not correctness.** Code that works and code you
+understand are different things, and the tool only guarantees the first.
+
+**Commit to a position before you ask.** A prompt you wrote after thinking gets
+you something to evaluate. A prompt you wrote instead of thinking gets you
+something to accept.
+
+**Delegate the typing, not the deciding.**

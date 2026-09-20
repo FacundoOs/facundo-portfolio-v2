@@ -31,6 +31,16 @@ export const posts: Post[] = [
     tags: ['Ollama', 'Local LLMs', 'Continue.dev', 'Developer tooling'],
     published: true,
   },
+  {
+    slug: 'staying-in-the-loop-with-ai-coding',
+    title: 'Staying in the loop when the AI writes the code',
+    description:
+      'The failure mode of coding with an AI tool is not bad code, it is shipping changes that work while you slowly stop knowing why they are shaped that way. Three changes that put the decisions back in my hands.',
+    date: '2026-09-20',
+    readingMinutes: 6,
+    tags: ['AI coding', 'Claude Code', 'Engineering practice', 'Architecture'],
+    published: true,
+  },
 ]
 
 export const publishedPosts = posts
