@@ -4,6 +4,7 @@ export type Project = {
   tech: string[]
   image?: string
   repo?: string
+  site?: string
 }
 
 export const projects: Project[] = [
@@ -14,6 +15,7 @@ export const projects: Project[] = [
     tech: ['Next.js', 'OpenAI API', 'Web Scraping'],
     image: '/images/projects/company-brochure-ai.png',
     repo: 'https://github.com/FacundoOs/company-brochure-ai',
+    site: 'https://company-brochure-ai.vercel.app/',
   },
   {
     title: 'Good Morning News',

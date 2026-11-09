@@ -32,14 +32,26 @@ export default function Projects() {
 
               <div className="mono mt-4 flex items-center gap-4 border-t border-[var(--border)] pt-4 text-xs">
                 {project.repo && (
-                  <a
-                    href={project.repo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-faint transition-colors duration-[160ms] hover:text-text"
-                  >
-                    Code &rarr;
-                  </a>
+                  <>
+                    <a
+                      href={project.repo}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-faint transition-colors duration-[160ms] hover:text-text"
+                    >
+                      Code &rarr;
+                    </a>
+                    {project.site && (
+                      <a
+                        href={project.site}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-faint transition-colors duration-[160ms] hover:text-text"
+                      >
+                        Live Site &rarr;
+                      </a>
+                    )}
+                  </>
                 )}
               </div>
             </div>
